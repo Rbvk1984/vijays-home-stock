@@ -1,0 +1,9 @@
+{
+  "name": "Our Home Stock",
+  "short_name": "Home Stock",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#EEF0E4",
+  "theme_color": "#1F3A2E",
+  "icons": []
+}
