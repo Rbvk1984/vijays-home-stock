@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Our Home Stock</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F3A2E">
+<meta name="color-scheme" content="light only">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  html{ color-scheme: light only; }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg: #E4E9D9 !important; --surface: #FFFFFF !important; --text: #23291F !important;
+      --text-soft: #5B6459 !important; --border: #DDE2D2 !important;
+    }
+  }
+  html, body{ background-color:#EEF0E4 !important; }
+  :root{
+    --bg: #E4E9D9;
+    --surface: #FFFFFF;
+    --nav: #1F3A2E;
+    --nav-light: #2E5241;
+    --accent: #D9A441;
+    --accent-dark: #B4831A;
+    --alert: #C1502E;
+    --alert-bg: #F7E2D8;
+    --ok: #4F7A5B;
+    --ok-bg: #E1EBE2;
+    --mid: #C98A2E;
+    --mid-bg: #F7EBD6;
+    --text: #23291F;
+    --text-soft: #5B6459;
+    --border: #DDE2D2;
+    --radius-card: 14px;
+    --radius-pill: 999px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif; -webkit-tap-highlight-color:transparent;
+    min-height:100vh; padding-bottom:76px;
+  }
+  h1,h2,h3, .brand, .nav-label{ font-family:'Fredoka',sans-serif; }
+
+  /* ---------- Desktop width cap: keep the app phone-sized on large screens ---------- */
+  @media (min-width: 560px){
+    #app{ max-width:480px; margin:0 auto; box-shadow:0 0 40px rgba(0,0,0,0.08); min-height:100vh; }
+    .bottom-nav{ max-width:480px; left:50%; transform:translateX(-50%); }
+    #pin-screen .pin-card{ box-shadow:0 20px 60px rgba(0,0,0,0.35); }
+  }
+
+  /* ---------- Verse strip ---------- */
+  .verse-strip{
+    text-align:center; padding:10px 24px; font-size:0.8rem; font-weight:700; font-style:italic;
+    color:var(--accent-dark); background:linear-gradient(135deg, #F7EBD6, #EEF0E4);
+    line-height:1.4; border-bottom:1px solid var(--border);
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:linear-gradient(135deg, var(--nav-light) 0%, var(--nav) 70%);
+    color:#fff; padding:18px 20px 16px;
+    display:flex; align-items:center; justify-content:space-between;
+    border-radius:0 0 20px 20px; box-shadow:0 6px 20px rgba(31,58,46,0.25);
+  }
+  .brand{ font-size:1.35rem; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .whoami{ display:flex; align-items:center; gap:10px; font-size:0.85rem; color:#DCE6DD; }
+  .whoami button{
+    background:var(--nav-light); border:none; color:#fff; padding:6px 12px;
+    border-radius:var(--radius-pill); font-size:0.8rem; cursor:pointer;
+  }
+
+  /* ---------- PIN screen ---------- */
+  #pin-screen{
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; padding:24px; background:var(--nav);
+    background:radial-gradient(circle at 30% 20%, var(--nav-light), var(--nav) 70%);
+  }
+  .pin-card{
+    background:var(--surface); border-radius:22px; padding:32px 28px; width:100%; max-width:340px;
+    box-shadow:0 20px 40px rgba(0,0,0,0.25); text-align:center;
+  }
+  .pin-card h1{ margin:0 0 4px; font-size:1.5rem; color:var(--nav); }
+  .pin-card p{ margin:0 0 20px; color:var(--text-soft); font-size:0.9rem; }
+  #who-select{
+    display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:18px;
+  }
+  .who-chip{
+    padding:8px 16px; border-radius:var(--radius-pill); border:2px solid var(--border);
+    background:#fff; cursor:pointer; font-weight:600; font-size:0.9rem; color:var(--text-soft);
+  }
+  .who-chip.active{ border-color:var(--accent); background:var(--accent); color:#fff; }
+  #pin-dots{ display:flex; gap:12px; justify-content:center; margin:14px 0 20px; }
+  .pin-dot{ width:14px; height:14px; border-radius:50%; border:2px solid var(--border); }
+  .pin-dot.filled{ background:var(--nav); border-color:var(--nav); }
+  .keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .key{
+    padding:16px 0; border-radius:14px; border:none; background:var(--bg);
+    font-size:1.2rem; font-weight:600; cursor:pointer; color:var(--text);
+  }
+  .key:active{ background:var(--border); }
+  .key.wide{ font-size:0.9rem; color:var(--text-soft); }
+  #pin-error{ color:var(--alert); font-size:0.85rem; height:18px; margin-top:8px; }
+
+  /* ---------- Dashboard summary strip ---------- */
+  .dashboard-strip{
+    display:flex; gap:8px; padding:16px 16px 4px; overflow-x:auto; scrollbar-width:none;
+  }
+  .dashboard-strip::-webkit-scrollbar{ display:none; }
+  .stat-chip{
+    flex:1; min-width:82px; border-radius:14px; padding:10px 8px; text-align:center;
+    display:flex; flex-direction:column; gap:2px; color:#fff;
+  }
+  .stat-chip .stat-num{ font-family:'Fredoka',sans-serif; font-size:1.3rem; font-weight:700; }
+  .stat-chip .stat-label{ font-size:0.68rem; opacity:0.95; line-height:1.15; }
+  .stat-chip.ok{ background:linear-gradient(135deg, var(--ok), #3c6249); }
+  .stat-chip.mid{ background:linear-gradient(135deg, var(--mid), #9a6b1e); }
+  .stat-chip.low{ background:linear-gradient(135deg, var(--alert), #9c3d22); }
+  .stat-chip.cart{ background:linear-gradient(135deg, var(--nav-light), var(--nav)); }
+
+  /* ---------- Needs Your Attention ---------- */
+  .attention-section{ padding:14px 16px 4px; }
+  .attention-title{
+    font-family:'Fredoka',sans-serif; font-size:0.95rem; font-weight:600; color:var(--nav);
+    margin-bottom:10px; display:flex; align-items:center; gap:6px;
+  }
+  .attention-group{ margin-bottom:12px; }
+  .attention-group-label{
+    font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
+    margin-bottom:6px; padding-left:2px;
+  }
+  .attention-group-label.low{ color:var(--alert); }
+  .attention-group-label.mid{ color:var(--mid); }
+  .attention-row{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:10px 14px; display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:pointer;
+  }
+  .attention-row .emoji{ font-size:1.4rem; }
+  .attention-row .info{ flex:1; }
+  .attention-row .info .name{ font-weight:600; font-size:0.9rem; }
+  .attention-row .info .meta{ font-size:0.7rem; color:var(--text-soft); }
+  .attention-empty{
+    text-align:center; color:var(--ok); background:var(--ok-bg); border-radius:12px;
+    padding:16px; font-size:0.85rem; font-weight:600;
+  }
+
+  /* ---------- Updated-by line on cards ---------- */
+  .updated-by{ font-size:0.68rem; color:var(--text-soft); margin-top:-2px; }
+
+  /* ---------- Category chips ---------- */
+  .chip-row{
+    display:flex; gap:8px; overflow-x:auto; padding:16px 16px 4px; scrollbar-width:none;
+  }
+  .chip-row::-webkit-scrollbar{ display:none; }
+  .chip{
+    flex:0 0 auto; padding:8px 14px; border-radius:var(--radius-pill); background:var(--surface);
+    border:1px solid var(--border); font-size:0.85rem; font-weight:600; color:var(--text-soft);
+    cursor:pointer; white-space:nowrap;
+  }
+  .chip.active{ background:linear-gradient(135deg, var(--nav-light), var(--nav)); color:#fff; border-color:var(--nav); }
+
+  /* ---------- Item grid ---------- */
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:12px 16px 24px; }
+  .card{
+    background:var(--surface); border-radius:var(--radius-card); padding:14px;
+    border:1px solid var(--border); border-left:4px solid var(--border);
+    display:flex; flex-direction:column; gap:8px;
+    position:relative; box-shadow:0 3px 10px rgba(35,41,31,0.06);
+  }
+  .card.status-low{ border-left-color:var(--alert); }
+  .card.status-mid{ border-left-color:var(--mid); }
+  .card.status-ok{ border-left-color:var(--ok); }
+  .card .emoji-photo{
+    width:100%; aspect-ratio:1.6; border-radius:10px; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; font-size:2.5rem;
+    overflow:hidden;
+  }
+  .emoji-photo.status-low{ background:linear-gradient(160deg, var(--alert-bg), #fff); }
+  .emoji-photo.status-mid{ background:linear-gradient(160deg, var(--mid-bg), #fff); }
+  .emoji-photo.status-ok{ background:linear-gradient(160deg, var(--ok-bg), #fff); }
+  .card .emoji-photo img{ width:100%; height:100%; object-fit:cover; }
+  .card .item-name{ font-weight:700; font-size:0.98rem; line-height:1.2; }
+  .status-pill{
+    align-self:flex-start; font-size:0.72rem; font-weight:700; padding:3px 9px;
+    border-radius:var(--radius-pill);
+  }
+  .status-pill.low{ background:var(--alert-bg); color:var(--alert); }
+  .status-pill.mid{ background:var(--mid-bg); color:var(--mid); }
+  .status-pill.ok{ background:var(--ok-bg); color:var(--ok); }
+
+  .level-control{ display:flex; gap:6px; }
+  .level-btn{
+    flex:1; padding:7px 0; border-radius:9px; border:1.5px solid var(--border); background:#fff;
+    font-size:0.75rem; font-weight:700; cursor:pointer; color:var(--text-soft);
+  }
+  .level-btn.selected.low{ background:var(--alert); border-color:var(--alert); color:#fff; }
+  .level-btn.selected.medium{ background:var(--mid); border-color:var(--mid); color:#fff; }
+  .level-btn.selected.high{ background:var(--ok); border-color:var(--ok); color:#fff; }
+
+  .numeric-control{ display:flex; align-items:center; justify-content:space-between; }
+  .numeric-control .qty{ font-weight:700; font-size:1rem; }
+  .numeric-control button{
+    width:32px; height:32px; border-radius:50%; border:none; background:var(--bg);
+    font-size:1.1rem; font-weight:700; cursor:pointer; color:var(--nav);
+  }
+  .delete-x{
+    position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%;
+    background:var(--bg); border:none; color:var(--text-soft); font-size:0.75rem; cursor:pointer;
+    display:none;
+  }
+  .admin-mode .delete-x{ display:block; }
+
+  /* ---------- Shopping list ---------- */
+  .shop-list{ padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .shop-row{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:12px 14px; display:flex; align-items:center; gap:12px;
+  }
+  .shop-row .emoji{ font-size:1.6rem; }
+  .shop-row .info{ flex:1; }
+  .shop-row .info .name{ font-weight:600; font-size:0.92rem; }
+  .shop-row .info .cat{ font-size:0.75rem; color:var(--text-soft); }
+  .empty-state{ text-align:center; color:var(--text-soft); padding:40px 20px; font-size:0.9rem; }
+  .empty-state .big{ font-size:2rem; display:block; margin-bottom:8px; }
+
+  /* ---------- Bottom nav ---------- */
+  .bottom-nav{
+    position:fixed; bottom:0; left:0; right:0; background:var(--surface);
+    border-top:1px solid var(--border); display:flex; padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+    gap:6px; z-index:20;
+  }
+  .nav-item{
+    flex:1; text-align:center; padding:8px 0; border-radius:12px; cursor:pointer;
+    color:var(--text-soft); font-size:0.72rem; font-weight:600;
+  }
+  .nav-item .icon{ font-size:1.25rem; display:block; }
+  .nav-item.active{ color:var(--nav); background:var(--bg); }
+
+  /* ---------- Add item modal ---------- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none;
+    align-items:flex-end; z-index:30;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{
+    background:var(--surface); width:100%; border-radius:20px 20px 0 0; padding:22px 20px 28px;
+    max-height:85vh; overflow-y:auto;
+  }
+  .modal h3{ margin:0 0 14px; }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:0.8rem; font-weight:600; color:var(--text-soft); margin-bottom:5px; }
+  .field input, .field select{
+    width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--border);
+    font-size:0.95rem; font-family:inherit; background:#fff;
+  }
+  .field .row2{ display:flex; gap:10px; }
+  .field .row2 > *{ flex:1; }
+  .modal .actions{ display:flex; gap:10px; margin-top:6px; }
+  .btn{
+    flex:1; padding:12px 0; border-radius:12px; border:none; font-weight:700; cursor:pointer; font-size:0.95rem;
+  }
+  .btn.primary{ background:var(--nav); color:#fff; }
+  .btn.ghost{ background:var(--bg); color:var(--text-soft); }
+  .fab{
+    position:fixed; right:18px; bottom:88px; width:52px; height:52px; border-radius:50%;
+    background:var(--accent); color:#fff; border:none; font-size:1.5rem; box-shadow:0 8px 20px rgba(0,0,0,0.25);
+    cursor:pointer; z-index:15; display:none;
+  }
+  .admin-mode .fab{ display:block; }
+
+  #config-warning{
+    background:var(--alert-bg); color:var(--alert); font-size:0.8rem; padding:10px 16px;
+    text-align:center; display:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="config-warning">⚠️ Supabase not configured yet — edit the CONFIG section in index.html</div>
+
+<!-- ===================== PIN SCREEN ===================== -->
+<div id="pin-screen">
+  <div class="pin-card">
+    <h1>🏠 Our Home Stock</h1>
+    <p>Pick your name and enter your PIN</p>
+    <div id="who-select"></div>
+    <div id="pin-dots"></div>
+    <div class="keypad" id="keypad"></div>
+    <div id="pin-error"></div>
+  </div>
+</div>
+
+<!-- ===================== MAIN APP ===================== -->
+<div id="app" style="display:none;">
+  <div class="verse-strip">"People do not live by bread alone, but by every word that comes from the mouth of God" — Matthew 4:4</div>
+  <div class="topbar">
+    <div class="brand">🏠 Our Home Stock</div>
+    <div class="whoami">
+      <span id="current-user-label"></span>
+      <button onclick="logout()">Switch</button>
+    </div>
+  </div>
+
+  <!-- HOME TAB -->
+  <div id="tab-home">
+    <div class="dashboard-strip" id="dashboard-strip"></div>
+    <div class="attention-section" id="attention-section"></div>
+    <div class="chip-row" id="category-chips"></div>
+    <div class="grid" id="item-grid"></div>
+  </div>
+
+  <!-- SHOPPING LIST TAB -->
+  <div id="tab-shop" style="display:none;">
+    <div class="shop-list" id="shop-list"></div>
+  </div>
+
+  <button class="fab" onclick="openAddModal()">+</button>
+
+  <div class="bottom-nav">
+    <div class="nav-item active" id="nav-home" onclick="switchTab('home')">
+      <span class="icon">🏠</span>Home
+    </div>
+    <div class="nav-item" id="nav-shop" onclick="switchTab('shop')">
+      <span class="icon">🛒</span>Shopping List
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ADD / EDIT ITEM MODAL ===================== -->
+<div class="modal-backdrop" id="add-modal-backdrop">
+  <div class="modal">
+    <h3 id="modal-title">Add an item</h3>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="new-name" placeholder="e.g. Tomato">
+    </div>
+    <div class="field row2">
+      <div>
+        <label>Emoji</label>
+        <input type="text" id="new-emoji" placeholder="🍅" maxlength="4">
+      </div>
+      <div>
+        <label>Category</label>
+        <select id="new-category"></select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Track by</label>
+      <select id="new-type" onchange="toggleNewTypeFields()">
+        <option value="level">Low / Medium / High</option>
+        <option value="numeric">Amount (kg, litres, pcs...)</option>
+      </select>
+    </div>
+    <div class="field row2" id="new-numeric-fields" style="display:none;">
+      <div>
+        <label>Unit</label>
+        <input type="text" id="new-unit" placeholder="kg">
+      </div>
+      <div>
+        <label>Low-stock threshold</label>
+        <input type="number" id="new-threshold" placeholder="0.5">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="btn primary" id="modal-submit-btn" onclick="submitNewItem()">Add item</button>
+    </div>
+    <button class="btn ghost" id="modal-delete-btn" style="display:none; width:100%; margin-top:10px; color:var(--alert);" onclick="deleteFromModal()">Remove this item</button>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG — paste your own Supabase project details here
+   (Project Settings → API in your Supabase dashboard)
+   ===================================================================== */
+const SUPABASE_URL = "https://prypoybnyfypzfjwsbai.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_lEYb7WZZ0RrixNMahPxqyw_MTaCPLZB";
+
+/* Optional: Telegram notifications. Leave blank to skip for now. */
+const TELEGRAM_BOT_TOKEN = "";
+const TELEGRAM_CHAT_ID = "";
+
+/* ===================================================================== */
+
+let supabaseClient;
+if (SUPABASE_URL.startsWith("http")) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+  document.getElementById('config-warning').style.display = 'block';
+}
+
+let familyMembers = [];
+let categories = [];
+let items = [];
+let selectedMember = null;
+let enteredPin = "";
+let currentUser = null; // { id, name, role }
+let activeCategory = "all";
+let currentTab = "home";
+
+/* ---------------- PIN SCREEN ---------------- */
+
+async function initPinScreen(){
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient.from('family_members').select('*').order('created_at');
+  if (error) { console.error(error); return; }
+  familyMembers = data;
+  const who = document.getElementById('who-select');
+  who.innerHTML = '';
+  familyMembers.forEach(m => {
+    const chip = document.createElement('div');
+    chip.className = 'who-chip';
+    chip.textContent = m.name;
+    chip.onclick = () => selectMember(m, chip);
+    who.appendChild(chip);
+  });
+  if (familyMembers.length) selectMember(familyMembers[0], who.children[0]);
+
+  const keypad = document.getElementById('keypad');
+  keypad.innerHTML = '';
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  keys.forEach(k => {
+    const btn = document.createElement('button');
+    btn.className = 'key' + (k === '⌫' ? ' wide' : '');
+    btn.textContent = k;
+    if (k === '') { btn.style.visibility = 'hidden'; }
+    else if (k === '⌫') { btn.onclick = () => backspacePin(); }
+    else { btn.onclick = () => pressPin(k); }
+    keypad.appendChild(btn);
+  });
+  renderPinDots();
+}
+
+function selectMember(m, chipEl){
+  selectedMember = m;
+  document.querySelectorAll('.who-chip').forEach(c => c.classList.remove('active'));
+  chipEl.classList.add('active');
+  enteredPin = '';
+  renderPinDots();
+  document.getElementById('pin-error').textContent = '';
+}
+
+function renderPinDots(){
+  const wrap = document.getElementById('pin-dots');
+  wrap.innerHTML = '';
+  for (let i=0;i<4;i++){
+    const d = document.createElement('div');
+    d.className = 'pin-dot' + (i < enteredPin.length ? ' filled' : '');
+    wrap.appendChild(d);
+  }
+}
+
+function pressPin(digit){
+  if (enteredPin.length >= 4) return;
+  enteredPin += digit;
+  renderPinDots();
+  if (enteredPin.length === 4) checkPin();
+}
+
+function backspacePin(){
+  enteredPin = enteredPin.slice(0, -1);
+  renderPinDots();
+  document.getElementById('pin-error').textContent = '';
+}
+
+function checkPin(){
+  if (!selectedMember) return;
+  if (selectedMember.pin === enteredPin){
+    currentUser = { id: selectedMember.id, name: selectedMember.name, role: selectedMember.role };
+    document.getElementById('pin-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('current-user-label').textContent = `👋 ${currentUser.name}`;
+    document.body.classList.toggle('admin-mode', currentUser.role === 'admin');
+    loadAppData();
+  } else {
+    document.getElementById('pin-error').textContent = 'Wrong PIN, try again';
+    enteredPin = '';
+    setTimeout(renderPinDots, 200);
+  }
+}
+
+function logout(){
+  currentUser = null;
+  enteredPin = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('pin-screen').style.display = 'flex';
+  renderPinDots();
+}
+
+/* ---------------- MAIN APP DATA ---------------- */
+
+async function loadAppData(){
+  const { data: cats } = await supabaseClient.from('categories').select('*').order('sort_order');
+  categories = cats || [];
+  await refreshItems();
+  renderCategoryChips();
+  subscribeRealtime();
+  populateNewItemCategorySelect();
+}
+
+async function refreshItems(){
+  const { data } = await supabaseClient.from('items').select('*').order('name');
+  items = data || [];
+  renderGrid();
+  renderShopList();
+  renderDashboard();
+  renderAttentionList();
+}
+
+/* ---------------- DASHBOARD SUMMARY STRIP ---------------- */
+
+function renderDashboard(){
+  const wrap = document.getElementById('dashboard-strip');
+  const okCount = items.filter(i => statusFor(i).cls === 'ok').length;
+  const midCount = items.filter(i => statusFor(i).cls === 'mid').length;
+  const lowCount = items.filter(i => statusFor(i).cls === 'low').length;
+  const cartCount = midCount + lowCount;
+
+  wrap.innerHTML = `
+    <div class="stat-chip ok"><div class="stat-num">${okCount}</div><div class="stat-label">🟢 Well stocked</div></div>
+    <div class="stat-chip mid"><div class="stat-num">${midCount}</div><div class="stat-label">🟠 Running low</div></div>
+    <div class="stat-chip low"><div class="stat-num">${lowCount}</div><div class="stat-label">🔴 Buy soon</div></div>
+    <div class="stat-chip cart"><div class="stat-num">${cartCount}</div><div class="stat-label">🛒 Shopping list</div></div>
+  `;
+}
+
+/* ---------------- NEEDS YOUR ATTENTION ---------------- */
+
+function jumpToItemCategory(item){
+  activeCategory = item.category_id;
+  renderCategoryChips();
+  renderGrid();
+}
+
+function renderAttentionList(){
+  const wrap = document.getElementById('attention-section');
+  const low = items.filter(i => statusFor(i).cls === 'low');
+  const mid = items.filter(i => statusFor(i).cls === 'mid');
+
+  if (!low.length && !mid.length){
+    wrap.innerHTML = `
+      <div class="attention-title">🔔 Needs Your Attention</div>
+      <div class="attention-empty">✅ Nothing needs attention right now</div>
+    `;
+    return;
+  }
+
+  function groupHtml(list, label, cls){
+    if (!list.length) return '';
+    const rows = list.map(item => `
+      <div class="attention-row" data-id="${item.id}">
+        <div class="emoji">${item.emoji}</div>
+        <div class="info"><div class="name">${item.name}</div></div>
+      </div>
+    `).join('');
+    return `<div class="attention-group">
+      <div class="attention-group-label ${cls}">${label}</div>
+      ${rows}
+    </div>`;
+  }
+
+  wrap.innerHTML = `
+    <div class="attention-title">🔔 Needs Your Attention</div>
+    ${groupHtml(low, '🔴 Buy Now', 'low')}
+    ${groupHtml(mid, '🟠 Running Low', 'mid')}
+  `;
+
+  wrap.querySelectorAll('.attention-row').forEach(row => {
+    row.onclick = () => {
+      const item = items.find(i => i.id === row.dataset.id);
+      if (item) jumpToItemCategory(item);
+    };
+  });
+}
+
+function subscribeRealtime(){
+  supabaseClient.channel('items-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, () => {
+      refreshItems();
+    })
+    .subscribe();
+}
+
+function renderCategoryChips(){
+  const row = document.getElementById('category-chips');
+  row.innerHTML = '';
+  const allChip = document.createElement('div');
+  allChip.className = 'chip' + (activeCategory === 'all' ? ' active' : '');
+  allChip.textContent = 'All';
+  allChip.onclick = () => { activeCategory = 'all'; renderCategoryChips(); renderGrid(); };
+  row.appendChild(allChip);
+  categories.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (activeCategory === c.id ? ' active' : '');
+    chip.textContent = `${c.emoji} ${c.name}`;
+    chip.onclick = () => { activeCategory = c.id; renderCategoryChips(); renderGrid(); };
+    row.appendChild(chip);
+  });
+}
+
+function statusFor(item){
+  if (item.quantity_type === 'level'){
+    if (item.quantity_level === 'low') return { cls:'low', label:'🔴 Buy soon' };
+    if (item.quantity_level === 'medium') return { cls:'mid', label:'🟠 Getting low' };
+    return { cls:'ok', label:'🟢 Stocked' };
+  } else {
+    const qty = Number(item.quantity_value);
+    const th = Number(item.low_threshold);
+    if (qty <= th) return { cls:'low', label:'🔴 Buy soon' };
+    if (qty <= th * 2) return { cls:'mid', label:'🟠 Getting low' };
+    return { cls:'ok', label:'🟢 Stocked' };
+  }
+}
+
+function renderGrid(){
+  const grid = document.getElementById('item-grid');
+  grid.innerHTML = '';
+  const list = items.filter(i => activeCategory === 'all' || i.category_id === activeCategory);
+  if (!list.length){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><span class="big">📭</span>No items here yet.</div>`;
+    return;
+  }
+  list.forEach(item => grid.appendChild(renderCard(item)));
+}
+
+function renderCard(item){
+  const card = document.createElement('div');
+  const status = statusFor(item);
+  card.className = 'card status-' + status.cls;
+
+  const photo = document.createElement('div');
+  photo.className = 'emoji-photo status-' + status.cls;
+  photo.innerHTML = item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : item.emoji;
+  card.appendChild(photo);
+
+  const del = document.createElement('button');
+  del.className = 'delete-x';
+  del.textContent = '✕';
+  del.onclick = () => deleteItem(item.id);
+  card.appendChild(del);
+
+  const name = document.createElement('div');
+  name.className = 'item-name';
+  name.textContent = item.name;
+  name.style.cursor = 'pointer';
+  name.title = 'Tap to edit';
+  name.onclick = () => openEditModal(item);
+  card.appendChild(name);
+
+  const pill = document.createElement('div');
+  pill.className = 'status-pill ' + status.cls;
+  pill.textContent = status.label;
+  card.appendChild(pill);
+
+  if (item.updated_by){
+    const meta = document.createElement('div');
+    meta.className = 'updated-by';
+    meta.textContent = `Updated by ${item.updated_by} • ${formatUpdatedTime(item.updated_at)}`;
+    card.appendChild(meta);
+  }
+
+  if (item.quantity_type === 'level'){
+    const ctrl = document.createElement('div');
+    ctrl.className = 'level-control';
+    ['low','medium','high'].forEach(lvl => {
+      const btn = document.createElement('button');
+      btn.className = 'level-btn' + (item.quantity_level === lvl ? ` selected ${lvl}` : '');
+      btn.textContent = lvl[0].toUpperCase() + lvl.slice(1);
+      btn.onclick = () => updateLevel(item, lvl);
+      ctrl.appendChild(btn);
+    });
+    card.appendChild(ctrl);
+  } else {
+    const ctrl = document.createElement('div');
+    ctrl.className = 'numeric-control';
+    const minus = document.createElement('button');
+    minus.textContent = '−';
+    minus.onclick = () => updateNumeric(item, -stepFor(item));
+    const qty = document.createElement('div');
+    qty.className = 'qty';
+    qty.textContent = `${trimNum(item.quantity_value)} ${item.unit}`;
+    const plus = document.createElement('button');
+    plus.textContent = '+';
+    plus.onclick = () => updateNumeric(item, stepFor(item));
+    ctrl.appendChild(minus); ctrl.appendChild(qty); ctrl.appendChild(plus);
+    card.appendChild(ctrl);
+  }
+
+  return card;
+}
+
+function formatUpdatedTime(iso){
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const yest = new Date(now); yest.setDate(now.getDate() - 1);
+  const isYesterday = d.toDateString() === yest.toDateString();
+  const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (sameDay) return timeStr;
+  if (isYesterday) return `Yesterday, ${timeStr}`;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + `, ${timeStr}`;
+}
+
+function stepFor(item){
+  return item.unit === 'pcs' ? 1 : 0.5;
+}
+function trimNum(n){
+  n = Number(n);
+  return Number.isInteger(n) ? n : n.toFixed(1);
+}
+
+async function updateLevel(item, level){
+  const wasLow = item.quantity_level === 'low';
+  await supabaseClient.from('items').update({
+    quantity_level: level, updated_by: currentUser.name, updated_at: new Date().toISOString()
+  }).eq('id', item.id);
+  if (level === 'low' && !wasLow) notifyLowStock(item);
+}
+
+async function updateNumeric(item, delta){
+  const newQty = Math.max(0, Number(item.quantity_value) + delta);
+  const wasLow = Number(item.quantity_value) <= Number(item.low_threshold);
+  const nowLow = newQty <= Number(item.low_threshold);
+  await supabaseClient.from('items').update({
+    quantity_value: newQty, updated_by: currentUser.name, updated_at: new Date().toISOString()
+  }).eq('id', item.id);
+  if (nowLow && !wasLow) notifyLowStock(item);
+}
+
+async function deleteItem(id){
+  if (!confirm('Remove this item?')) return;
+  await supabaseClient.from('items').delete().eq('id', id);
+}
+
+/* ---------------- SHOPPING LIST ---------------- */
+
+function renderShopList(){
+  const wrap = document.getElementById('shop-list');
+  wrap.innerHTML = '';
+  const low = items.filter(i => statusFor(i).cls !== 'ok')
+    .sort((a,b) => (statusFor(a).cls === 'low' ? 0 : 1) - (statusFor(b).cls === 'low' ? 0 : 1));
+  if (!low.length){
+    wrap.innerHTML = `<div class="empty-state"><span class="big">✅</span>Everything's stocked up!</div>`;
+    return;
+  }
+  low.forEach(item => {
+    const cat = categories.find(c => c.id === item.category_id);
+    const row = document.createElement('div');
+    row.className = 'shop-row';
+    const status = statusFor(item);
+    row.innerHTML = `
+      <div class="emoji">${item.emoji}</div>
+      <div class="info">
+        <div class="name">${item.name}</div>
+        <div class="cat">${cat ? cat.name : ''}</div>
+      </div>
+      <div class="status-pill ${status.cls}">${status.label}</div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+/* ---------------- TABS ---------------- */
+
+function switchTab(tab){
+  currentTab = tab;
+  document.getElementById('tab-home').style.display = tab === 'home' ? 'block' : 'none';
+  document.getElementById('tab-shop').style.display = tab === 'shop' ? 'block' : 'none';
+  document.getElementById('nav-home').classList.toggle('active', tab === 'home');
+  document.getElementById('nav-shop').classList.toggle('active', tab === 'shop');
+}
+
+/* ---------------- ADD ITEM ---------------- */
+
+let editingItemId = null;
+
+function populateNewItemCategorySelect(){
+  const sel = document.getElementById('new-category');
+  sel.innerHTML = categories.map(c => `<option value="${c.id}">${c.emoji} ${c.name}</option>`).join('');
+}
+
+function openAddModal(){
+  editingItemId = null;
+  document.getElementById('modal-title').textContent = 'Add an item';
+  document.getElementById('modal-submit-btn').textContent = 'Add item';
+  document.getElementById('modal-delete-btn').style.display = 'none';
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-emoji').value = '';
+  document.getElementById('new-type').value = 'level';
+  document.getElementById('new-unit').value = '';
+  document.getElementById('new-threshold').value = '';
+  toggleNewTypeFields();
+  document.getElementById('add-modal-backdrop').classList.add('open');
+}
+
+function openEditModal(item){
+  editingItemId = item.id;
+  document.getElementById('modal-title').textContent = 'Edit item';
+  document.getElementById('modal-submit-btn').textContent = 'Save changes';
+  document.getElementById('modal-delete-btn').style.display = 'block';
+  document.getElementById('new-name').value = item.name;
+  document.getElementById('new-emoji').value = item.emoji;
+  document.getElementById('new-category').value = item.category_id;
+  document.getElementById('new-type').value = item.quantity_type;
+  document.getElementById('new-unit').value = item.unit || '';
+  document.getElementById('new-threshold').value = item.low_threshold ?? '';
+  toggleNewTypeFields();
+  document.getElementById('add-modal-backdrop').classList.add('open');
+}
+
+function closeAddModal(){
+  document.getElementById('add-modal-backdrop').classList.remove('open');
+  editingItemId = null;
+}
+function toggleNewTypeFields(){
+  const isNumeric = document.getElementById('new-type').value === 'numeric';
+  document.getElementById('new-numeric-fields').style.display = isNumeric ? 'flex' : 'none';
+}
+
+async function submitNewItem(){
+  const name = document.getElementById('new-name').value.trim();
+  const emoji = document.getElementById('new-emoji').value.trim() || '📦';
+  const categoryId = document.getElementById('new-category').value;
+  const type = document.getElementById('new-type').value;
+  if (!name) return alert('Give the item a name');
+
+  const payload = {
+    name, emoji, category_id: categoryId, quantity_type: type,
+    updated_by: currentUser.name, updated_at: new Date().toISOString()
+  };
+  if (type === 'numeric'){
+    payload.unit = document.getElementById('new-unit').value.trim() || 'kg';
+    payload.low_threshold = Number(document.getElementById('new-threshold').value) || 0;
+    if (!editingItemId) payload.quantity_value = 0;
+  } else {
+    if (!editingItemId) payload.quantity_level = 'medium';
+  }
+
+  if (editingItemId){
+    await supabaseClient.from('items').update(payload).eq('id', editingItemId);
+  } else {
+    await supabaseClient.from('items').insert(payload);
+  }
+  closeAddModal();
+}
+
+async function deleteFromModal(){
+  if (!editingItemId) return;
+  if (!confirm('Remove this item?')) return;
+  await supabaseClient.from('items').delete().eq('id', editingItemId);
+  closeAddModal();
+}
+
+/* ---------------- TELEGRAM NOTIFICATION (optional) ---------------- */
+
+async function notifyLowStock(item){
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+  const text = `🔴 ${item.emoji} ${item.name} is running low — updated by ${currentUser.name}. Add it to the shopping list!`;
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
+    });
+  } catch (e) { console.error('Telegram notify failed', e); }
+}
+
+/* ---------------- INIT ---------------- */
+initPinScreen();
+</script>
+</body>
+</html>
